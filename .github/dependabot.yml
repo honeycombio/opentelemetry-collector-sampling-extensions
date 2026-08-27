@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directories:
+      - "/redissamplerstateextension"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "type: dependencies"
+    commit-message:
+      prefix: "maint"
+      include: "scope"
+    groups:
+      otel:
+        patterns:
+          - "go.opentelemetry.io/*"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "type: dependencies"
+      - "no-changelog"
+    commit-message:
+      prefix: "maint"
+      include: "scope"

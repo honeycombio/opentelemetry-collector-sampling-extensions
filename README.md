@@ -1,5 +1,7 @@
 # opentelemetry-collector-samplerstate
 
+[![OSS Lifecycle](https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fhoneycombio%2Fopentelemetry-collector-samplerstate%2Fmain%2FOSSMETADATA)](https://github.com/honeycombio/home/blob/main/honeycomb-oss-lifecycle-and-practices.md)
+
 Sampler state extensions for the [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector).
 
 Adaptive samplers hold per-key state (traffic counts) that is normally private
