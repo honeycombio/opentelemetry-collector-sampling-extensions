@@ -1,7 +1,7 @@
 // Copyright Honeycomb.io
 // SPDX-License-Identifier: Apache-2.0
 
-package redissamplerstateextension // import "github.com/honeycombio/opentelemetry-collector-samplerstate/redissamplerstateextension"
+package redissamplingstateextension // import "github.com/honeycombio/opentelemetry-collector-samplingstate/redissamplingstateextension"
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 	"go.opentelemetry.io/collector/config/configopaque"
 )
 
-// Config configures the redis_sampler_state extension.
+// Config configures the redis_sampling_state extension.
 type Config struct {
 	// Endpoint is the Redis server address as host:port.
 	Endpoint string `mapstructure:"endpoint"`

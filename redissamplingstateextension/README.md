@@ -1,6 +1,6 @@
-# Redis Sampler State Extension
+# Redis Sampling State Extension
 
-Type: `redis_sampler_state`
+Type: `redis_sampling_state`
 
 Backs the `adaptive_tail_sampling` processor's `shared_counters` option with
 Redis. Every collector instance publishes its per-interval traffic counts with
@@ -14,11 +14,11 @@ pipelined `HINCRBYFLOAT` and reads back the merged totals, so
 
 ```yaml
 extensions:
-  redis_sampler_state:
+  redis_sampling_state:
     endpoint: redis:6379        # required, host:port
     password: ${env:REDIS_PW}   # optional
     db: 0                       # optional, Redis logical database
-    key_prefix: samplerstate    # optional, default samplerstate
+    key_prefix: samplingstate    # optional, default samplingstate
     bucket_ttl: 10m             # optional, how long interval buckets persist
 
 processors:
@@ -31,10 +31,10 @@ processors:
           fingerprint_attributes:
             - resource.attributes["service.name"]
           shared_counters:
-            extension: redis_sampler_state
+            extension: redis_sampling_state
 
 service:
-  extensions: [redis_sampler_state]
+  extensions: [redis_sampling_state]
 ```
 
 All instances sharing a Redis deployment must use the same `key_prefix`, rule

@@ -1,7 +1,7 @@
 // Copyright Honeycomb.io
 // SPDX-License-Identifier: Apache-2.0
 
-package redissamplerstateextension // import "github.com/honeycombio/opentelemetry-collector-samplerstate/redissamplerstateextension"
+package redissamplingstateextension // import "github.com/honeycombio/opentelemetry-collector-samplingstate/redissamplingstateextension"
 
 import (
 	"context"
@@ -12,9 +12,9 @@ import (
 )
 
 // Type is the component type of the extension.
-var Type = component.MustNewType("redis_sampler_state")
+var Type = component.MustNewType("redis_sampling_state")
 
-// NewFactory creates the redis_sampler_state extension factory.
+// NewFactory creates the redis_sampling_state extension factory.
 func NewFactory() extension.Factory {
 	return extension.NewFactory(
 		Type,
@@ -26,7 +26,7 @@ func NewFactory() extension.Factory {
 
 func createDefaultConfig() component.Config {
 	return &Config{
-		KeyPrefix: "samplerstate",
+		KeyPrefix: "samplingstate",
 		BucketTTL: 10 * time.Minute,
 	}
 }

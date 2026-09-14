@@ -1,4 +1,4 @@
-module github.com/honeycombio/opentelemetry-collector-samplerstate/redissamplerstateextension
+module github.com/honeycombio/opentelemetry-collector-samplingstate/redissamplingstateextension
 
 go 1.25.0
 

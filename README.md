@@ -1,8 +1,8 @@
-# opentelemetry-collector-samplerstate
+# opentelemetry-collector-samplingstate
 
-[![OSS Lifecycle](https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fhoneycombio%2Fopentelemetry-collector-samplerstate%2Fmain%2FOSSMETADATA)](https://github.com/honeycombio/home/blob/main/honeycomb-oss-lifecycle-and-practices.md)
+[![OSS Lifecycle](https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fhoneycombio%2Fopentelemetry-collector-samplingstate%2Fmain%2FOSSMETADATA)](https://github.com/honeycombio/home/blob/main/honeycomb-oss-lifecycle-and-practices.md)
 
-Sampler state extensions for the [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector).
+Sampling state extensions for the [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector).
 
 Adaptive samplers hold per-key state (traffic counts) that is normally private
 to one collector instance. The extensions in this repository back that state
@@ -17,7 +17,7 @@ against combined budgets rather than per-instance ones.
 
 | Extension | Type | Backend |
 |-----------|------|---------|
-| [redissamplerstateextension](./redissamplerstateextension) | `redis_sampler_state` | Redis |
+| [redissamplingstateextension](./redissamplingstateextension) | `redis_sampling_state` | Redis |
 
 ## The counter store contract
 

@@ -1,7 +1,7 @@
 // Copyright Honeycomb.io
 // SPDX-License-Identifier: Apache-2.0
 
-package redissamplerstateextension
+package redissamplingstateextension
 
 import (
 	"testing"
@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func testExtension(t *testing.T) *samplerStateExtension {
+func testExtension(t *testing.T) *samplingStateExtension {
 	t.Helper()
 	srv := miniredis.RunT(t)
 	cfg := createDefaultConfig().(*Config)
@@ -94,7 +94,7 @@ func TestFactory(t *testing.T) {
 	f := NewFactory()
 	assert.Equal(t, Type, f.Type())
 	cfg := f.CreateDefaultConfig().(*Config)
-	assert.Equal(t, "samplerstate", cfg.KeyPrefix)
+	assert.Equal(t, "samplingstate", cfg.KeyPrefix)
 	assert.Equal(t, 10*time.Minute, cfg.BucketTTL)
 	assert.ErrorContains(t, cfg.Validate(), "endpoint", "default config must not validate without an endpoint")
 
