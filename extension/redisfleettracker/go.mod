@@ -3,7 +3,7 @@ module github.com/honeycombio/opentelemetry-collector-sampling-extensions/extens
 go 1.25.0
 
 require (
-	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.22.0
 	github.com/stretchr/testify v1.12.1
