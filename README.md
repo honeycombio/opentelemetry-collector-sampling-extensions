@@ -1,13 +1,15 @@
-# opentelemetry-collector-samplingstate
+# opentelemetry-collector-sampling-extensions
 
-[![OSS Lifecycle](https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fhoneycombio%2Fopentelemetry-collector-samplingstate%2Fmain%2FOSSMETADATA)](https://github.com/honeycombio/home/blob/main/honeycomb-oss-lifecycle-and-practices.md)
+[![OSS Lifecycle](https://img.shields.io/osslifecycle?file_url=https%3A%2F%2Fraw.githubusercontent.com%2Fhoneycombio%2Fopentelemetry-collector-sampling-extensions%2Fmain%2FOSSMETADATA)](https://github.com/honeycombio/home/blob/main/honeycomb-oss-lifecycle-and-practices.md)
 
-Sampling state extensions for the [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector).
+This repository hosts sampling-related extensions for the
+[OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector).
 
-Adaptive samplers hold per-key state (traffic counts) that is normally private
-to one collector instance. The extensions in this repository back that state
-with shared infrastructure so a fleet of collector instances can sample
-against combined budgets rather than per-instance ones.
+Adaptive samplers often need state or coordination that is normally private
+to one collector instance, for example shared throughput counters or fleet
+membership for per-key routing. The extensions in this repository back that
+state with shared infrastructure so a fleet of collector instances can
+sample as one coordinated system rather than a set of independent ones.
 
 > [!WARNING]
 > Experimental. Interfaces and configuration may change without notice. Do not
@@ -17,22 +19,22 @@ against combined budgets rather than per-instance ones.
 
 | Extension | Type | Backend |
 |-----------|------|---------|
-| [redissamplingstateextension](./redissamplingstateextension) | `redis_sampling_state` | Redis |
+| [redisfleettracker](./extension/redisfleettracker) | `redis_fleet_tracker` | Redis |
 
-## The counter store contract
+## The fleet tracker contract
 
-Extensions here implement the counter store interface consumed by the
-`adaptive_tail_sampling` processor's `shared_counters` option
-([opentelemetry-collector-contrib#50577](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/50577)),
+`redisfleettracker` exposes live fleet membership to other components,
 satisfied structurally so no shared package is needed:
 
 ```go
-AddCounts(ctx context.Context, samplerID string, bucket int64, counts map[string]float64) error
-ReadCounts(ctx context.Context, samplerID string, bucket int64) (map[string]float64, error)
+type fleetTracker interface {
+	SubscribeMemberCount(callback func(count int)) (cancel func(), err error)
+}
 ```
 
-Counts are additive: every instance publishes what it observed for an interval
-bucket, reads back the merged totals, and recomputes its own rates locally.
+This is the contract consumed by the `adaptive_tail_sampling` processor's
+per-key rendezvous routing
+([opentelemetry-collector-contrib#50577](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/50577)).
 
 ## License
 

@@ -2,4 +2,4 @@
 
 We maintain separate changelogs for each extension in this repo:
 
-- [redissamplingstateextension](./redissamplingstateextension/CHANGELOG.md)
+- [redisfleettracker](./extension/redisfleettracker/CHANGELOG.md)
