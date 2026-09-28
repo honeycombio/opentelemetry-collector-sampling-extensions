@@ -13,6 +13,12 @@ status:
 tests:
   config:
     endpoint: "localhost:6379"
+  goleak:
+    ignore:
+      top:
+        # go-redis retries failed dials on a 1s backoff; Close stops the loop
+        # but a goroutine mid-sleep can outlive goleak's retry window.
+        - "github.com/redis/go-redis/v9/internal/pool.(*ConnPool).tryDial"
 
 telemetry:
   metrics:

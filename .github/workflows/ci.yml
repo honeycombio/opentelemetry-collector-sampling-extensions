@@ -37,8 +37,9 @@ jobs:
         with:
           go-version-file: extension/redisfleettracker/go.mod
           cache-dependency-path: extension/redisfleettracker/go.sum
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v8
         with:
+          version: v2.13.2
           working-directory: extension/redisfleettracker
 
   generate-check:
