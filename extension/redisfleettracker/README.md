@@ -5,9 +5,10 @@ Type: `redis_fleet_tracker`
 Tracks how many collector instances are currently alive in a "fleet" using a
 Redis sorted set, and lets other components subscribe to the live member
 count. Built for consumers that need fleet size to scale a per-instance
-budget, most directly the `adaptive_tail_sampling` processor's per-key
-rendezvous routing
-([opentelemetry-collector-contrib#50577](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/50577)).
+budget, most directly the `adaptive_tail_sampling` processor, which divides
+each `adaptive_throughput` rule's `goal_throughput` by the live count so the
+goal reads as a fleet-wide budget rather than a per-instance one
+([opentelemetry-collector-contrib#51544](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/51544)).
 
 > [!WARNING]
 > Experimental. Configuration and the `SubscribeMemberCount` contract may
@@ -42,6 +43,44 @@ service:
 | `key_prefix` | `fleet_tracker` | no | Namespaces every key this extension writes. |
 | `heartbeat_interval` | `3s` | no | How often this instance refreshes its membership. |
 | `ttl` | `10s` | no | How long a member is considered live after its last heartbeat. Must be greater than `heartbeat_interval`. |
+
+## Using it with `adaptive_tail_sampling`
+
+Name this extension in the processor's `fleet_tracker` setting. The processor
+resolves it by method shape, so neither side imports the other.
+
+```yaml
+extensions:
+  redis_fleet_tracker:
+    endpoint: redis:6379
+
+processors:
+  adaptive_tail_sampling:
+    fleet_tracker: redis_fleet_tracker
+    rules:
+      - name: throughput-cap
+        sampler:
+          type: adaptive_throughput
+          goal_throughput: 1000   # fleet-wide budget; divided by the live member count
+
+service:
+  extensions: [redis_fleet_tracker]
+  pipelines:
+    traces:
+      processors: [adaptive_tail_sampling]
+```
+
+`fleet_tracker` is not in contrib v0.162.0. It merged after that release and
+ships in the next one. Only `adaptive_throughput` rules are affected, since
+percentage-based samplers already compose across instances without division.
+
+The processor's
+[Fleet-wide throughput budget](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/adaptivetailsamplingprocessor/README.md#fleet-wide-throughput-budget-fleet_tracker)
+section covers the division behaviour and its caveats, including the integer
+division and the per-instance floor of 1 span/s. One caveat worth repeating
+here: a collector counts as one fleet member however many pipelines it runs,
+but each pipeline's samplers target the divided goal independently, so run
+the fleet budget in one pipeline only.
 
 ## Fleet scoping
 
