@@ -15,6 +15,12 @@ a set of independent ones.
 > Experimental. Interfaces and configuration may change without notice. Do not
 > depend on this for critical workloads yet.
 
+These extensions are expected to move into the OpenTelemetry Collector once
+the capabilities they provide settle upstream. This repository is where they
+are developed in the meantime, so the module path will change when that
+happens. Pin a version if you adopt one, and expect to repoint the import
+rather than to receive it at this path indefinitely.
+
 ## Extensions
 
 | Extension | Type | Backend |

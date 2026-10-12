@@ -15,7 +15,9 @@ Verified against Redis 7 and Valkey 8.
 > [!WARNING]
 > Experimental, and the configuration may still change. The
 > `SubscribeMemberCount` signature matches the contract merged into contrib,
-> so a change there would be breaking and called out.
+> so a change there would be breaking and called out. This extension is also
+> expected to move upstream into the collector eventually, which would change
+> its module path, so pin a version if you adopt it.
 
 ## Configuration
 
