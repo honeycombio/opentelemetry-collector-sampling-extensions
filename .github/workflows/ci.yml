@@ -72,3 +72,28 @@ jobs:
       - name: integration test
         working-directory: extension/redisfleettracker
         run: go test -race -tags integration ./...
+
+  # Cross-component check against the adaptive_tail_sampling processor that
+  # consumes this extension. Its own module, so the extension never takes a
+  # dependency on contrib.
+  cross-component:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: integrationtest/go.mod
+          cache-dependency-path: integrationtest/go.sum
+      - name: gofmt and vet
+        working-directory: integrationtest
+        run: |
+          gofmt -l . | tee /dev/stderr | test -z "$(cat)"
+          go vet -tags integration ./...
+      - name: cross-component test
+        working-directory: integrationtest
+        run: go test -race -tags integration ./...
