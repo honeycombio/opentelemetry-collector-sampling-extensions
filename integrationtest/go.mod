@@ -2,10 +2,13 @@ module github.com/honeycombio/opentelemetry-collector-sampling-extensions/integr
 
 go 1.26.0
 
+// Requires the published v0.1.0 above, but builds against the working tree so
+// CI catches a change here that breaks the contract before it is released.
+// Drop this replace to test the published artifact instead.
 replace github.com/honeycombio/opentelemetry-collector-sampling-extensions/extension/redisfleettracker => ../extension/redisfleettracker
 
 require (
-	github.com/honeycombio/opentelemetry-collector-sampling-extensions/extension/redisfleettracker v0.0.0-00010101000000-000000000000
+	github.com/honeycombio/opentelemetry-collector-sampling-extensions/extension/redisfleettracker v0.1.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/adaptivetailsamplingprocessor v0.162.1-0.20261012203520-d4b055b56f2e
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/collector/component v1.68.1-0.20261009162812-02beb4e3f10f

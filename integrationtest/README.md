@@ -18,6 +18,11 @@ go test -tags integration ./...
 
 `REDIS_ENDPOINT` overrides the default of `localhost:6379`.
 
-The contrib processor is currently pinned to a pseudo-version, because
+The extension is required at its published version but `replace`d to the
+working tree, so CI catches a change that breaks the contract before it is
+released. Drop the replace to run against the published artifact instead.
+Both modes pass.
+
+The contrib processor is still pinned to a pseudo-version, because
 `fleet_tracker` merged after contrib v0.162.0 and is not in a tagged release
 yet. Move it to the release version once one ships.
