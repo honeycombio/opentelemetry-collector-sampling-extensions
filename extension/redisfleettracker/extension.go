@@ -89,6 +89,7 @@ func newExtension(cfg *Config, logger *zap.Logger, telemetry *metadata.Telemetry
 func (e *fleetTrackerExtension) Start(ctx context.Context, _ component.Host) error {
 	opts := &redis.Options{
 		Addr:     e.cfg.Endpoint,
+		Username: e.cfg.Username,
 		Password: string(e.cfg.Password),
 		DB:       e.cfg.DB,
 	}

@@ -15,6 +15,10 @@ import (
 type Config struct {
 	// Endpoint is the Redis server address as host:port.
 	Endpoint string `mapstructure:"endpoint"`
+	// Username authenticates to Redis when ACLs are in use (Redis 6 and
+	// later). Optional; leave unset for password-only auth, which Redis
+	// treats as the default user.
+	Username string `mapstructure:"username"`
 	// Password authenticates to Redis. Optional.
 	Password configopaque.String `mapstructure:"password"`
 	// DB is the Redis logical database number.

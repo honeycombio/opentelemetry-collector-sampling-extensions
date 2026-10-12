@@ -23,6 +23,7 @@ Verified against Redis 7 and Valkey 8.
 extensions:
   redis_fleet_tracker:
     endpoint: redis:6379         # required, host:port
+    username: ${env:REDIS_USER}  # optional, for ACL auth
     password: ${env:REDIS_PW}    # optional
     db: 0                        # optional, Redis logical database
     tls:
@@ -39,6 +40,7 @@ service:
 | Field | Default | Required | Description |
 |-------|---------|----------|--------------|
 | `endpoint` | - | yes | Redis server address, `host:port`. |
+| `username` | `""` | no | Redis ACL username (Redis 6 and later). Leave unset for password-only auth. |
 | `password` | `""` | no | Redis auth password. |
 | `db` | `0` | no | Redis logical database number. |
 | `tls` | `insecure: true` | no | TLS settings for the Redis connection. Disabled (plain TCP) by default; set `tls::insecure: false` to opt in. |

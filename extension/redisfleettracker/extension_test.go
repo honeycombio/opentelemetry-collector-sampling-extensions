@@ -330,3 +330,58 @@ func TestExtension_UnreachableEndpoint(t *testing.T) {
 
 	require.NoError(t, e.Shutdown(t.Context()))
 }
+
+func TestExtension_UsernameAuth(t *testing.T) {
+	srv := miniredis.RunT(t)
+	srv.RequireUserAuth("fleetuser", "fleetpw")
+
+	cfg := newTestConfig(srv.Addr())
+	cfg.Username = "fleetuser"
+	cfg.Password = "fleetpw"
+
+	e := newTestExtension(t, cfg, nil)
+	require.NoError(t, e.Start(t.Context(), componenttest.NewNopHost()))
+	t.Cleanup(func() { require.NoError(t, e.Shutdown(t.Context())) })
+
+	var mu sync.Mutex
+	var lastSeen int
+	cancel, err := e.SubscribeMemberCount(func(count int) {
+		mu.Lock()
+		lastSeen = count
+		mu.Unlock()
+	})
+	require.NoError(t, err)
+	t.Cleanup(cancel)
+
+	waitFor(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return lastSeen == 1
+	}, "ACL-authenticated heartbeat should register this member")
+}
+
+func TestExtension_UsernameAuth_WrongUserCannotHeartbeat(t *testing.T) {
+	srv := miniredis.RunT(t)
+	srv.RequireUserAuth("fleetuser", "fleetpw")
+
+	cfg := newTestConfig(srv.Addr())
+	cfg.Username = "wronguser"
+	cfg.Password = "fleetpw"
+
+	e := newTestExtension(t, cfg, nil)
+	// Start never fails on an unreachable or rejecting Redis by design.
+	require.NoError(t, e.Start(t.Context(), componenttest.NewNopHost()))
+	t.Cleanup(func() { require.NoError(t, e.Shutdown(t.Context())) })
+
+	cancel, err := e.SubscribeMemberCount(func(int) {
+		t.Error("no count should be delivered while auth is rejected")
+	})
+	require.NoError(t, err)
+	t.Cleanup(cancel)
+
+	time.Sleep(3 * testHeartbeatInterval)
+	e.mu.Lock()
+	count := e.count
+	e.mu.Unlock()
+	assert.Equal(t, unknownCount, count, "a rejected heartbeat must leave the count unknown")
+}
