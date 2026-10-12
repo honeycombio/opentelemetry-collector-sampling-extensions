@@ -2,17 +2,20 @@
 
 Type: `redis_fleet_tracker`
 
-Tracks how many collector instances are currently alive in a "fleet" using a
-Redis sorted set, and lets other components subscribe to the live member
-count. Built for consumers that need fleet size to scale a per-instance
-budget, most directly the `adaptive_tail_sampling` processor, which divides
-each `adaptive_throughput` rule's `goal_throughput` by the live count so the
-goal reads as a fleet-wide budget rather than a per-instance one
-([opentelemetry-collector-contrib#51544](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/51544)).
+Counts the collector instances currently alive in a "fleet" using a Redis
+sorted set, and lets other components subscribe to that count. Built for
+consumers that scale a per-instance budget by fleet size, most directly the
+`adaptive_tail_sampling` processor, which divides each `adaptive_throughput`
+rule's `goal_throughput` by the live count
+([contrib#51544](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/51544)).
+
+Only sorted-set and expiry commands are used, so API-compatible servers work.
+Verified against Redis 7 and Valkey 8.
 
 > [!WARNING]
-> Experimental. Configuration and the `SubscribeMemberCount` contract may
-> change without notice.
+> Experimental, and the configuration may still change. The
+> `SubscribeMemberCount` signature matches the contract merged into contrib,
+> so a change there would be breaking and called out.
 
 ## Configuration
 
@@ -76,27 +79,26 @@ percentage-based samplers already compose across instances without division.
 
 The processor's
 [Fleet-wide throughput budget](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/adaptivetailsamplingprocessor/README.md#fleet-wide-throughput-budget-fleet_tracker)
-section covers the division behaviour and its caveats, including the integer
-division and the per-instance floor of 1 span/s. One caveat worth repeating
-here: a collector counts as one fleet member however many pipelines it runs,
-but each pipeline's samplers target the divided goal independently, so run
-the fleet budget in one pipeline only.
+section covers the division and its caveats, including integer division and
+the per-instance floor of 1 span/s. One worth repeating here. A collector
+counts as one fleet member however many pipelines it runs, but each
+pipeline's samplers target the divided goal independently, so run the fleet
+budget in one pipeline only.
 
 ## Fleet scoping
 
-`fleet` defaults to the extension's own component ID, so instances with an
-identical `redis_fleet_tracker` config count together automatically. Two
-common patterns:
+`fleet` names the group counted together and defaults to the extension's own
+component ID, so instances with identical config count together.
 
-- Named instances, e.g. `redis_fleet_tracker/prod`, scope a fleet on their
-  own via the component ID; no `fleet` setting needed.
-- When identical configs across environments share one Redis backend, set
-  `fleet` explicitly, e.g. `fleet: ${env:DEPLOY_ENV}`, so instances in
-  different environments don't count each other.
+To share one Redis across environments, give each a distinct `fleet`, e.g.
+`fleet: ${env:DEPLOY_ENV}`. Named instances such as
+`redis_fleet_tracker/prod` already scope themselves through the component ID
+and need no `fleet` setting. `key_prefix` and `db` separate the keyspace
+further when you want test keys kept clear of production ones.
 
-Getting this wrong fails in one direction: fleets that should be separate
-but collide inflate the observed count N, which under-samples everywhere
-that count feeds a per-instance budget.
+Fleet collisions fail in one direction. Two fleets that should be separate
+inflate the observed count, which under-samples wherever that count feeds a
+per-instance budget.
 
 ## Data model
 
@@ -111,20 +113,18 @@ PEXPIRE <key>  <2 * ttl_ms>                      # dead-fleet key self-cleans
 ```
 
 Registering self happens before pruning, so self is always counted even if
-its own previous heartbeat expired. `member_id` is a 16-character hex string:
-the first 16 hex characters of `sha256(service.instance.id)` when that
-resource attribute is set, otherwise a random UUID generated once at
-startup. It is never derived from hostnames or pod names, which can be
-reused across restarts and would then be indistinguishable from the
-previous instance.
+its own previous heartbeat expired. `member_id` is the first 16 hex
+characters of `sha256(service.instance.id)`, or a random UUID generated at
+startup when that attribute is unset. Hostnames and pod names are
+deliberately not used, since they get reused across restarts and the new
+instance would be indistinguishable from the old one.
 
 The collector generates a unique `service.instance.id` per process, so the
 default needs no attention. If you pin it under `service.telemetry.resource`,
-keep it unique per instance. Instances sharing one `service.instance.id`
-share a `member_id`, so they count as a single member and the fleet
-undercounts, which over-delivers against any budget derived from the count.
-Pinning it to a pod name or hostname is fine; pinning it to a constant or a
-deployment-wide value is not.
+keep it unique per instance. Instances sharing one share a `member_id` and
+count as a single member, so the fleet undercounts and over-delivers against
+any budget derived from the count. A pod name or hostname is fine, a constant
+or a deployment-wide value is not.
 
 On shutdown, the extension makes a best-effort `ZREM <key> <member_id>` with
 a short timeout before closing the Redis client.
@@ -150,11 +150,12 @@ type fleetTracker interface {
 }
 ```
 
-Consumers assert this interface structurally against the extension
-retrieved via `host.GetExtensions`; no shared package is required. The
-callback fires once a count is known and again whenever it changes;
-`cancel` unsubscribes and is idempotent, though one in-flight delivery may
-still complete after it returns.
+Consumers assert this interface structurally against the extension retrieved
+via `host.GetExtensions`, so no shared package is required. The callback
+fires once a count is known and again whenever it changes, and must not
+block. Deliveries are serialised against each other, all made from one
+goroutine. `cancel` unsubscribes and is idempotent, though one in-flight
+delivery may still complete after it returns.
 
 ## Telemetry
 
