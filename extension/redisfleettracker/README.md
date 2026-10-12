@@ -118,6 +118,14 @@ startup. It is never derived from hostnames or pod names, which can be
 reused across restarts and would then be indistinguishable from the
 previous instance.
 
+The collector generates a unique `service.instance.id` per process, so the
+default needs no attention. If you pin it under `service.telemetry.resource`,
+keep it unique per instance. Instances sharing one `service.instance.id`
+share a `member_id`, so they count as a single member and the fleet
+undercounts, which over-delivers against any budget derived from the count.
+Pinning it to a pod name or hostname is fine; pinning it to a constant or a
+deployment-wide value is not.
+
 On shutdown, the extension makes a best-effort `ZREM <key> <member_id>` with
 a short timeout before closing the Redis client.
 

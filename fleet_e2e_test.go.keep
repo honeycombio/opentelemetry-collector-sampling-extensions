@@ -1,0 +1,181 @@
+package adaptivetailsamplingprocessor
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/redis/go-redis/v9"
+	rft "github.com/honeycombio/opentelemetry-collector-sampling-extensions/extension/redisfleettracker"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/extension"
+	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/processor"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+)
+
+const redisEndpoint = "127.0.0.1:6399"
+
+// redisMembers reads the live member count straight out of Redis, independent
+// of anything the extension reports to the processor.
+func redisMembers(t *testing.T) int {
+	t.Helper()
+	c := redis.NewClient(&redis.Options{Addr: redisEndpoint})
+	defer c.Close()
+	keys, err := c.Keys(context.Background(), "fleet_tracker:*").Result()
+	require.NoError(t, err)
+	total := 0
+	for _, k := range keys {
+		n, err := c.ZCard(context.Background(), k).Result()
+		require.NoError(t, err)
+		total += int(n)
+	}
+	return total
+}
+
+// hostWithExtensions satisfies the slice of component.Host the processor uses
+// to resolve its fleet_tracker.
+type hostWithExtensions struct {
+	exts map[component.ID]component.Component
+}
+
+func (h hostWithExtensions) GetExtensions() map[component.ID]component.Component {
+	return h.exts
+}
+
+// startTracker builds and starts a real redis_fleet_tracker with its own
+// service.instance.id, so each one registers as a distinct fleet member
+// (member_id is sha256(service.instance.id)).
+func startTracker(t *testing.T, instanceID, fleet string) extension.Extension {
+	t.Helper()
+
+	f := rft.NewFactory()
+	cfg := f.CreateDefaultConfig().(*rft.Config)
+	cfg.Endpoint = redisEndpoint
+	cfg.Fleet = fleet
+	cfg.HeartbeatInterval = 200 * time.Millisecond
+	cfg.TTL = 2 * time.Second
+
+	set := extension.Settings{
+		ID:                component.NewID(f.Type()),
+		TelemetrySettings: componenttest.NewNopTelemetrySettings(),
+	}
+	set.Resource = pcommon.NewResource()
+	set.Resource.Attributes().PutStr("service.instance.id", instanceID)
+
+	ext, err := f.Create(context.Background(), set, cfg)
+	require.NoError(t, err)
+	require.NoError(t, ext.Start(context.Background(), componenttest.NewNopHost()))
+	t.Cleanup(func() { _ = ext.Shutdown(context.Background()) })
+	return ext
+}
+
+func TestFleetTracker_EndToEnd_GoalDividesByLiveMembers(t *testing.T) {
+	fleet := "e2e-" + time.Now().Format("150405.000")
+
+	// Observe the processor's logs so we can read the goal it actually applies.
+	core, logs := observer.New(zapcore.DebugLevel)
+	logger := zap.New(core)
+
+	trackerA := startTracker(t, "instance-a", fleet)
+
+	pf := NewFactory()
+	cfg := pf.CreateDefaultConfig().(*Config)
+	cfg.DecisionDelay = 10 * time.Millisecond
+	cfg.TraceTimeout = time.Hour
+	trackerID := component.NewID(rft.NewFactory().Type())
+	cfg.FleetTrackerID = &trackerID
+	cfg.Rules = []RuleConfig{{
+		Name: "throughput-cap",
+		Sampler: SamplerConfig{
+			Type:            AdaptiveThroughput,
+			GoalThroughput:  1000,
+			MaxKeys:         nil,
+		},
+	}}
+
+	pset := processor.Settings{
+		ID:                component.NewID(pf.Type()),
+		TelemetrySettings: componenttest.NewNopTelemetrySettings(),
+		BuildInfo:         component.NewDefaultBuildInfo(),
+	}
+	pset.TelemetrySettings.Logger = logger
+
+	p, err := pf.CreateTraces(context.Background(), pset, cfg, consumertest.NewNop())
+	require.NoError(t, err)
+
+	host := hostWithExtensions{exts: map[component.ID]component.Component{
+		trackerID: trackerA,
+	}}
+	require.NoError(t, p.Start(context.Background(), host))
+	t.Cleanup(func() { require.NoError(t, p.Shutdown(context.Background())) })
+
+	// One member. fleetState starts at size 1, so reporting 1 is a no-change
+	// and the processor deliberately skips the setter. Assert the count was
+	// actually delivered instead, via the member_count field the callback logs.
+	assert.Eventually(t, func() bool {
+		return redisMembers(t) == 1
+	}, 10*time.Second, 200*time.Millisecond, "expected 1 member registered in redis")
+	assert.Empty(t, allGoals(logs), "no goal should be applied while N is unchanged at 1")
+	t.Logf("single member: redis members=%d, goals applied=%v", redisMembers(t), allGoals(logs))
+
+	// Second instance joins the same fleet.
+	trackerB := startTracker(t, "instance-b", fleet)
+
+	assert.Eventually(t, func() bool {
+		return redisMembers(t) == 2
+	}, 10*time.Second, 200*time.Millisecond, "expected 2 members registered in redis")
+
+	assert.Eventually(t, func() bool {
+		return appliedGoal(logs) == 500
+	}, 15*time.Second, 100*time.Millisecond,
+		"expected goal 500 after a second member joined, saw %v", allGoals(logs))
+	t.Logf("two members: redis members=%d, applied goal %d", redisMembers(t), appliedGoal(logs))
+
+	// Instance B leaves. It deregisters with ZREM on shutdown, so the count
+	// should drop back to 1 and the goal return to the configured value.
+	require.NoError(t, trackerB.Shutdown(context.Background()))
+
+	assert.Eventually(t, func() bool {
+		return redisMembers(t) == 1
+	}, 10*time.Second, 200*time.Millisecond, "expected B to deregister on shutdown")
+
+	assert.Eventually(t, func() bool {
+		return appliedGoal(logs) == 1000
+	}, 15*time.Second, 100*time.Millisecond,
+		"expected goal back to 1000 after B left, saw %v", allGoals(logs))
+	t.Logf("after B left: redis members=%d, applied goal %d", redisMembers(t), appliedGoal(logs))
+
+	t.Logf("goal sequence: %v", allGoals(logs))
+	for _, e := range logs.All() {
+		t.Logf("  log: %s %v", e.Message, e.Context)
+	}
+}
+
+// appliedGoal returns the goal from the most recent "applied fleet-divided
+// goal" log line, or -1 if none has been emitted.
+func appliedGoal(logs *observer.ObservedLogs) int64 {
+	g := allGoals(logs)
+	if len(g) == 0 {
+		return -1
+	}
+	return g[len(g)-1]
+}
+
+func allGoals(logs *observer.ObservedLogs) []int64 {
+	var out []int64
+	for _, e := range logs.FilterMessage("applied fleet-divided goal").All() {
+		for _, f := range e.Context {
+			if f.Key == "goal_per_sec" {
+				out = append(out, f.Integer)
+			}
+		}
+	}
+	return out
+}
