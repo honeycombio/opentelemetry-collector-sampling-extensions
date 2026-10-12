@@ -6,10 +6,10 @@ This repository hosts sampling-related extensions for the
 [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector).
 
 Adaptive samplers often need state or coordination that is normally private
-to one collector instance, for example shared throughput counters or fleet
-membership for per-key routing. The extensions in this repository back that
-state with shared infrastructure so a fleet of collector instances can
-sample as one coordinated system rather than a set of independent ones.
+to one collector instance, for example the live size of the fleet. The
+extensions in this repository back that state with shared infrastructure so a
+fleet of collector instances can sample as one coordinated system rather than
+a set of independent ones.
 
 > [!WARNING]
 > Experimental. Interfaces and configuration may change without notice. Do not
@@ -32,9 +32,10 @@ type fleetTracker interface {
 }
 ```
 
-This is the contract consumed by the `adaptive_tail_sampling` processor's
-per-key rendezvous routing
-([opentelemetry-collector-contrib#50577](https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/50577)).
+This is the contract consumed by the `adaptive_tail_sampling` processor, which
+divides each `adaptive_throughput` rule's `goal_throughput` by the live member
+count so the goal reads as a fleet-wide budget
+([contrib#51544](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/51544)).
 
 ## License
 
